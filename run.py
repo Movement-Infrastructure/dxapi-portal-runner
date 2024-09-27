@@ -29,6 +29,9 @@ with dx.installation(installation) as ctx:
         print(f'Found dataset with name {table_name}. Updating...')
     else:
         print(f'Did not find dataset with name {table_name}. Creating...')
+
+def create_dataset():
+
 # If dataset doesn't exist,
     # get schema of source table and create MIG dataset
 # Get data from source dataset
