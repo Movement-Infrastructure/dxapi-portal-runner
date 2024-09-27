@@ -14,6 +14,7 @@ print(f"user info: {user_info}\n")
 # Pass in name of BigQuery dataset from ScriptRunner
 dataset_id = sys.argv[1]
 table_name = sys.argv[2]
+# TODO: Error if params are missing
 
 print(f"dataset_id {dataset_id} and table_name {table_name}")
 
