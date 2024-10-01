@@ -95,7 +95,6 @@ def get_source_data() -> list:
     for row in rows:
         print(row.values()[0])
         data.append(row.values()[0])
-    print(data)
     return data
 
 def write_data_to_file(destination_dataset: DatasetOperations):
