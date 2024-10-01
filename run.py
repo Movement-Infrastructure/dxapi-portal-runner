@@ -32,8 +32,10 @@ credentials, project = google.auth.default(
 print(f"bigquery project: {project}")
 client = bigquery.Client(credentials=credentials, project=project)
 
-# get schema of target dataset
 def get_schema() -> DatasetSchema:
+    """
+    Get schema of source dataset from Portal BigQuery
+    """
     dataset_ref = client.dataset(dataset_id=dataset_id, project=project)
 
     table_ref = dataset_ref.table(table_name)
@@ -58,12 +60,14 @@ def get_schema() -> DatasetSchema:
         primary_key=primary_key
     )
 
-# If dataset doesn't exist, get schema of source table and create MIG dataset
 def create_dataset(installation: Installation) -> DatasetOperations:
+    """
+    Create MiG dataset using mig-dx-api client
+    """
     # Get schema of source dataset
     dataset_schema = get_schema()
 
-    # create Dataset
+    # create MiG dataset with source schema
     with dx.installation(installation) as ctx:
         dataset_name = f'{table_name}-phoenix'
         new_dataset = ctx.datasets.create(
@@ -75,6 +79,9 @@ def create_dataset(installation: Installation) -> DatasetOperations:
         return new_dataset
 
 def get_source_data() -> list:
+    """
+    Get data from Portal source dataset
+    """
     sql = f"""
         SELECT TO_JSON_STRING(t) json
         FROM (
@@ -91,8 +98,10 @@ def get_source_data() -> list:
     print(data)
     return data
 
-# Write portal data to mig landing bucket
 def write_data_to_file(destination_dataset: DatasetOperations):
+    """
+    Write data from Portal source dataset to file in MiG landing bucket
+    """
     # Get data from source dataset
     source_data = get_source_data()
 
@@ -114,6 +123,7 @@ with dx.installation(installation) as ctx:
     dataset_ops = ctx.datasets.find(name=table_name)
     if not dataset_ops:
         print(f'Did not find dataset with name {table_name}. Creating...')
+        # If dataset doesn't exist, get schema of source table and create MIG dataset
         dataset_ops = create_dataset()
     else:
         print(f'Found dataset with name {table_name}. Updating...')
