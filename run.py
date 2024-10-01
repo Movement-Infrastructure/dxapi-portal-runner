@@ -1,7 +1,13 @@
 import os
 import sys
 import google.auth
-from mig_dx_api import DX
+from mig_dx_api import (
+    DX,
+    DatasetSchema,
+    Installation,
+    SchemaProperty
+)
+from mig_dx_api._dataset import DatasetOperations
 from google.cloud import bigquery
 
 # Pass in name of BigQuery dataset from ScriptRunner
@@ -26,21 +32,77 @@ credentials, project = google.auth.default(
 print(f"bigquery project: {project}")
 client = bigquery.Client(credentials=credentials, project=project)
 
+# get schema of target dataset
+def get_schema() -> DatasetSchema:
+    dataset_ref = client.dataset(dataset_id=dataset_id, project=project)
+
+    table_ref = dataset_ref.table(table_name)
+
+    table = client.get_table(table_ref)
+
+    schema = table.schema
+    table_constraints = table.table_constraints # might not exist
+    primary_key = table_constraints.primary_key.columns if table_constraints else []
+
+    print(schema)
+    print(f"table constraints: {primary_key}")
+
+    properties = []
+    for field in schema:
+        # We don't care about the actual type of the field, the type is always "string"
+        property = SchemaProperty(name=field.name, type="string", required=not field.is_nullable)
+        properties.append(property)
+
+    return DatasetSchema(
+        properties=properties,
+        primary_key=primary_key
+    )
+
 # If dataset doesn't exist, get schema of source table and create MIG dataset
-def create_dataset():
-    # TODO:
+def create_dataset(installation: Installation) -> DatasetOperations:
     # Get schema of source dataset
+    dataset_schema = get_schema()
+
     # create Dataset
-    return
+    with dx.installation(installation) as ctx:
+        dataset_name = f'{table_name}-phoenix'
+        new_dataset = ctx.datasets.create(
+            name=dataset_name,
+            description='Dataset created through Portal Script Runner',
+            schema=dataset_schema
+        )
+        print(f'new dataset: {new_dataset}')
+        return new_dataset
+
+def get_source_data() -> list:
+    sql = f"""
+        SELECT TO_JSON_STRING(t) json
+        FROM (
+            SELECT *
+            FROM `{dataset_id}.{table_name}`
+        ) t
+    """
+    query_job = client.query(sql)
+    rows = query_job.result()
+    data = []
+    for row in rows:
+        print(row.values()[0])
+        data.append(row.values()[0])
+    print(data)
+    return data
 
 # Write portal data to mig landing bucket
-def write_data_to_file():
-    # TODO:
+def write_data_to_file(destination_dataset: DatasetOperations):
     # Get data from source dataset
+    source_data = get_source_data()
+
     # Get signed uploadurl from MIG
+    upload_url = destination_dataset.get_upload_url()
+
     # Upload the data for the dataset in MIG to presigned url
+    response = dataset_ops.upload_data_to_url(upload_url['url'], source_data)
+    print(f'upload response: {response}')
     # Log results
-    return
 
 # Check if dataset of specified name already exists
 installations = dx.get_installations()
@@ -52,9 +114,9 @@ with dx.installation(installation) as ctx:
     dataset_ops = ctx.datasets.find(name=table_name)
     if not dataset_ops:
         print(f'Did not find dataset with name {table_name}. Creating...')
-        create_dataset()
+        dataset_ops = create_dataset()
     else:
         print(f'Found dataset with name {table_name}. Updating...')
 
-    # Write data to mig bucket to be processed
-    write_data_to_file()
+    # Write data to mig bucket for processing
+    write_data_to_file(dataset_ops)
