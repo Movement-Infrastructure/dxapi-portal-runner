@@ -60,7 +60,7 @@ def get_schema() -> DatasetSchema:
         primary_key=primary_key
     )
 
-def create_dataset(installation: Installation) -> DatasetOperations:
+def create_dataset(installation: Installation, dataset_name: str) -> DatasetOperations:
     """
     Create MiG dataset using mig-dx-api client
     """
@@ -69,7 +69,6 @@ def create_dataset(installation: Installation) -> DatasetOperations:
 
     # create MiG dataset with source schema
     with dx.installation(installation) as ctx:
-        dataset_name = f'{table_name}-phoenix'
         new_dataset = ctx.datasets.create(
             name=dataset_name,
             description='Dataset created through Portal Script Runner',
@@ -123,7 +122,7 @@ with dx.installation(installation) as ctx:
     if not dataset_ops:
         print(f'Did not find dataset with name {table_name}. Creating...')
         # If dataset doesn't exist, get schema of source table and create MIG dataset
-        dataset_ops = create_dataset()
+        dataset_ops = create_dataset(installation, table_name)
     else:
         print(f'Found dataset with name {table_name}. Updating...')
 
