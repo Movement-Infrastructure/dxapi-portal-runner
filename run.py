@@ -108,6 +108,7 @@ def main():
     # TODO: error if there are no installations
     # how do I know if this is the right installation?
     installation = installations[0]
+    print(f'installation: {installation}')
 
     with dx.installation(installation) as ctx:
         destination_dataset = ctx.datasets.find(name=table_name)
