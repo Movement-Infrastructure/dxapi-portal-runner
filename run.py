@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 import google.auth
@@ -67,8 +68,8 @@ def get_source_data(client: bigquery.Client, dataset_id: str, table_name: str) -
     rows = query_job.result()
     data = []
     for row in rows:
-        print(row.values()[0])
-        data.append(row.values()[0])
+        row_data_string = row.values()[0]
+        data.append(json.loads(row_data_string))
     return data
 
 def write_data_to_file(source_data: list, destination_dataset: DatasetOperations, upload_url: str):
