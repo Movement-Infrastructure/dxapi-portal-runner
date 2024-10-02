@@ -111,14 +111,15 @@ def main():
     print(f'installation: {installation}')
 
     with dx.installation(installation) as ctx:
-        destination_dataset = ctx.datasets.find(name=table_name)
-        if not destination_dataset:
+        try:
+            destination_dataset = ctx.datasets.find(name=table_name)
+        except KeyError:
             print(f'Did not find dataset with name {table_name}. Creating...')
             # If dataset doesn't exist, get schema of source table and create MIG dataset
             schema = get_schema(client, table_name, dataset_id, project)
             destination_dataset = create_dataset(dx, installation, table_name, schema)
-        else:
-            print(f'Found dataset with name {table_name}. Updating...')
+
+        print(f'Found dataset with name {table_name}. Updating...')
 
         # Get data from source dataset
         source_data = get_source_data(client, dataset_id, table_name)
