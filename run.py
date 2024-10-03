@@ -17,13 +17,12 @@ def get_target_installation(installations: list[Installation], target_installati
     elif len(installations) == 1:
         target_install = installations[0]
         # error if the target installation id doesn't match the only existing installation
-        if target_installation_id:
-            if target_install.movement_app_installation_id != int(target_installation_id):
-                raise Exception(f"Installation {target_installation_id} not found")
+        if target_installation_id and target_install.movement_app_installation_id != int(target_installation_id):
+            raise Exception(f"Installation {target_installation_id} not found")
         return target_install
-    elif len(installations) > 1 and target_installation_id is None:
-        raise Exception("More than one installation available and no target installation id specified")
     else:
+        if target_installation_id is None:
+            raise Exception("More than one installation available and no target installation id specified")
         target_install_id = int(target_installation_id)
         for install in installations:
             if install.movement_app_installation_id == target_install_id:
@@ -102,7 +101,6 @@ def write_data_to_file(source_data: list, destination_dataset: DatasetOperations
     response = destination_dataset.upload_data_to_url(upload_url['url'], source_data)
     # Log results
     print(f'upload response: {response}')
-    
 
 def main(dataset_id: str, table_name: str, target_installation_id: str):
     print(f"Source dataset: {dataset_id}.{table_name}")
@@ -125,7 +123,7 @@ def main(dataset_id: str, table_name: str, target_installation_id: str):
 
     # Check if dataset of specified name already exists
     installations = dx.get_installations()
-    
+
     installation = get_target_installation(installations, target_installation_id)
 
     print(f'target installation found: {installation}')
@@ -153,10 +151,10 @@ def main(dataset_id: str, table_name: str, target_installation_id: str):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset_id', dest='dataset_id', type=str, help='Source dataset id', required=True)
-    parser.add_argument('--table_name', dest='table_name', type=str, 
+    parser.add_argument('--table_name', dest='table_name', type=str,
         help='Source table name, also used to name destination dataset', required=True)
-    parser.add_argument('--installation_id', dest='target_installation_id', type=str, 
-        help='Target installation id (optional)', required=False)
+    parser.add_argument('--installation_id', dest='target_installation_id', type=str,
+        help='Target installation id (optional when there is only one installation)', required=False)
     args = parser.parse_args()
     # Pass in name of BigQuery dataset from ScriptRunner
     main(args.dataset_id, args.table_name, args.target_installation_id)
