@@ -1,6 +1,6 @@
+import argparse
 import json
 import os
-import sys
 import google.auth
 from mig_dx_api import (
     DX,
@@ -10,6 +10,27 @@ from mig_dx_api import (
 )
 from mig_dx_api._dataset import DatasetOperations
 from google.cloud import bigquery
+
+def get_target_installation(installations: list[Installation], target_installation_id: str) -> Installation:
+    if len(installations) == 0:
+        raise Exception("No valid installations found")
+    elif len(installations) == 1:
+        target_install = installations[0]
+        # error if the target installation id doesn't match the only existing installation
+        if target_installation_id and target_install.movement_app_installation_id != int(target_installation_id):
+            raise Exception(f"Installation {target_installation_id} not found")
+        return target_install
+    else:
+        if target_installation_id is None:
+            raise Exception("More than one installation available and no target installation id specified")
+        target_install_id = int(target_installation_id)
+        for install in installations:
+            if install.movement_app_installation_id == target_install_id:
+                target_install = install
+                break
+        if target_install is None:
+            raise Exception("Installation {target_installation_id} not found")
+        return target_install
 
 def get_schema(client: bigquery.Client, table_name: str, dataset_id: str, project: str) -> DatasetSchema:
     """
@@ -78,15 +99,11 @@ def write_data_to_file(source_data: list, destination_dataset: DatasetOperations
     """
     # Upload the data for the dataset in MIG to presigned url
     response = destination_dataset.upload_data_to_url(upload_url['url'], source_data)
-    print(f'upload response: {response}')
     # Log results
+    print(f'upload response: {response}')
 
-def main():
-    # Pass in name of BigQuery dataset from ScriptRunner
-    dataset_id = sys.argv[1]
-    table_name = sys.argv[2]
-    # TODO: Error if params are missing
-    print(f"dataset_id {dataset_id} and table_name {table_name}")
+def main(dataset_id: str, table_name: str, target_installation_id: str):
+    print(f"Source dataset: {dataset_id}.{table_name}")
 
     # Initialize the mig client
     private_key = f"-----BEGIN PRIVATE KEY-----\n{os.environ.get("PRIVATE_KEY")}\n-----END PRIVATE KEY-----"
@@ -106,10 +123,10 @@ def main():
 
     # Check if dataset of specified name already exists
     installations = dx.get_installations()
-    # TODO: error if there are no installations
-    # how do I know if this is the right installation?
-    installation = installations[0]
-    print(f'installation: {installation}')
+
+    installation = get_target_installation(installations, target_installation_id)
+
+    print(f'target installation found: {installation}')
 
     with dx.installation(installation) as ctx:
         try:
@@ -132,4 +149,12 @@ def main():
         write_data_to_file(source_data, destination_dataset, upload_url)
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--dataset_id', dest='dataset_id', type=str, help='Source dataset id', required=True)
+    parser.add_argument('--table_name', dest='table_name', type=str,
+        help='Source table name, also used to name destination dataset', required=True)
+    parser.add_argument('--installation_id', dest='target_installation_id', type=str,
+        help='Target installation id (optional when there is only one installation)', required=False)
+    args = parser.parse_args()
+    # Pass in name of BigQuery dataset from ScriptRunner
+    main(args.dataset_id, args.table_name, args.target_installation_id)
