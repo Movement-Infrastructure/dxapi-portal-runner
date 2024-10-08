@@ -1,0 +1,20 @@
+[project]
+name = "dxapi-portal-runner"
+version = "0.1.0"
+description = "Script for moving data from Phoenix to the MIG Data Exchange"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.uv]
+managed = true
+dev-dependencies = [
+    "pytest>=8.3.3"
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/dxapi_portal_runner"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
