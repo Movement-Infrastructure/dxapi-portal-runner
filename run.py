@@ -143,7 +143,7 @@ def main(dataset_id: str, table_name: str, target_installation_id: str):
         source_data = get_source_data(client, dataset_id, table_name)
 
         # Get signed uploadurl from MIG
-        upload_url = destination_dataset.get_upload_url(mode="replace")
+        upload_url = destination_dataset.get_upload_url(mode='replace')
 
         # Write data to mig bucket for processing
         write_data_to_file(source_data, destination_dataset, upload_url)
