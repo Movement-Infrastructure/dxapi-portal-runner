@@ -9,7 +9,11 @@ dependencies = []
 [tool.uv]
 managed = true
 dev-dependencies = [
-    "pytest>=8.3.3"
+    "google-auth==2.29.0",
+    "google-cloud-bigquery==3.25.0",
+    "mig-dx-api==0.1.9",
+    "pytest>=8.3.3",
+    "pytest-mock>=3.14.0",
 ]
 
 [tool.hatch.build.targets.wheel]

@@ -11,13 +11,13 @@ from mig_dx_api import (
 from mig_dx_api._dataset import DatasetOperations
 from google.cloud import bigquery
 
-def get_target_installation(installations: list[Installation], target_installation_id: str) -> Installation:
+def get_target_installation(installations: list[Installation], target_installation_id: str = None) -> Installation:
     if len(installations) == 0:
         raise Exception("No valid installations found")
     elif len(installations) == 1:
         target_install = installations[0]
         # error if the target installation id doesn't match the only existing installation
-        if target_installation_id and target_install.movement_app_installation_id != int(target_installation_id):
+        if target_installation_id and target_install.installation_id != int(target_installation_id):
             raise Exception(f"Installation {target_installation_id} not found")
         return target_install
     else:
@@ -25,7 +25,7 @@ def get_target_installation(installations: list[Installation], target_installati
             raise Exception("More than one installation available and no target installation id specified")
         target_install_id = int(target_installation_id)
         for install in installations:
-            if install.movement_app_installation_id == target_install_id:
+            if install.installation_id == target_install_id:
                 target_install = install
                 break
         if target_install is None:
@@ -46,8 +46,8 @@ def get_schema(client: bigquery.Client, table_name: str, dataset_id: str, projec
     table_constraints = table.table_constraints # might not exist
     primary_key = table_constraints.primary_key.columns if table_constraints else []
 
-    print(schema)
-    print(f"table constraints: {primary_key}")
+    print(f'bigquery schema: {schema}')
+    print(f'table constraints: {primary_key}')
 
     properties = []
     for field in schema:
