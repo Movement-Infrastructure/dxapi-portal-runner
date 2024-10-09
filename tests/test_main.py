@@ -2,7 +2,7 @@ import pytest
 import datetime
 from google.cloud import bigquery
 from mig_dx_api import CreatedBy, Installation
-from uuid import UUID, uuid4
+from uuid import uuid4
 from unittest import mock
 from unittest.mock import patch
 
@@ -10,8 +10,6 @@ from dxapi_portal_runner.main import (
     get_target_installation,
     get_schema,
     get_source_data,
-    # write_data_to_file,
-    # main
 )
 
 TEST_APP_ID = str(uuid4())
@@ -126,11 +124,3 @@ def test_get_source_data(mock_bigquery):
     data = get_source_data(mock_bigquery, "dataset", "test_table")
     assert len(data) == 6
     assert data[0]['van_id'] == 241
-
-# def test_write_data_to_file():
-#     assert False
-
-# def test_main():
-#     # dataset doesn't exist
-#     # dataset does exist
-#     assert False
