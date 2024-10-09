@@ -17,7 +17,7 @@ dev-dependencies = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/dxapi_portal_runner"]
+packages = ["run.py"]
 
 [build-system]
 requires = ["hatchling"]

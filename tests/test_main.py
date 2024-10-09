@@ -6,7 +6,7 @@ from uuid import uuid4
 from unittest import mock
 from unittest.mock import patch
 
-from dxapi_portal_runner.main import (
+from run import (
     get_target_installation,
     get_schema,
     get_source_data,
