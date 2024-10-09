@@ -3,13 +3,13 @@ import datetime
 from google.cloud import bigquery
 from mig_dx_api import CreatedBy, Installation
 from uuid import UUID, uuid4
-from unittest.mock import patch, MagicMock
+from unittest import mock
+from unittest.mock import patch
 
 from dxapi_portal_runner.main import (
     get_target_installation,
     get_schema,
-    # create_dataset,
-    # get_source_data,
+    get_source_data,
     # write_data_to_file,
     # main
 )
@@ -20,11 +20,6 @@ TEST_CREATOR = CreatedBy(
     user_id = 123,
     display_name = 'Test User',
     email = 'test@example.com')
-
-# @pytest.fixture
-# def dx_client(mocker):
-#     mock_client = MagicMock()
-#     mocker.patch('client.get_installations', mock_client)
 
 def test_get_target_installation_default():
     installations = [
@@ -113,13 +108,24 @@ def test_get_schema(mock_bigquery):
     assert schema.primary_key == [primary_key]
     assert schema.properties[0].type == "string"
 
-
-# def test_create_dataset():
-#     assert False
-
-# def test_get_source_data():
-#     # row data coming back from bigquery is a string, not json
-#     assert False
+@patch('google.cloud.bigquery.Client', autospec=True)
+def test_get_source_data(mock_bigquery):
+    mock_query_job = mock.create_autospec(bigquery.QueryJob)
+    # row data coming back from bigquery is a string, not json
+    mock_rows = mock.create_autospec(bigquery.table.RowIterator)
+    mock_rows.__iter__.return_value = [
+        bigquery.Row(('{"van_id": 241, "first_name": "Erika", "last_name": "Testuser", "city": "Decatur", "state": "AL"}',), {'json':0}),
+        bigquery.Row(('{"van_id": 110, "first_name": "Ulysses", "last_name": "Testuser", "city": "Hoover", "state": "AL"}',), {'json':0}),
+        bigquery.Row(('{"van_id": 242, "first_name": "Earl", "last_name": "Testuser", "city": "Santa Clara", "state": "CA"}',), {'json':0}),
+        bigquery.Row(('{"van_id": 111, "first_name": "Quinn", "last_name": "Testuser", "city": "Clovis", "state": "CA"}',), {'json':0}),
+        bigquery.Row(('{"van_id": 103, "first_name": "Jane", "last_name": "Testuser", "city": "San Bernardino", "state": "CA"}',), {'json':0}),
+        bigquery.Row(('{"van_id": 117, "first_name": "Sylvia", "last_name": "Testuser", "city": "Elk Grove", "state": "CA"}',), {'json':0})
+    ]
+    mock_query_job.result.return_value = mock_rows
+    mock_bigquery.query.return_value = mock_query_job
+    data = get_source_data(mock_bigquery, "dataset", "test_table")
+    assert len(data) == 6
+    assert data[0]['van_id'] == 241
 
 # def test_write_data_to_file():
 #     assert False
