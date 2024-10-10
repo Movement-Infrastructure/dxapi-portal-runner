@@ -1,0 +1,17 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+
+# Distribution / packaging
+bin/
+lib/
+
+# Unit test
+.pytest_cache/
+
+# Environments
+.env
+.venv
+pyvenv.cfg
+
+# IDEs
+.vscode

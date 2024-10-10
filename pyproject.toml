@@ -1,0 +1,24 @@
+[project]
+name = "dxapi-portal-runner"
+version = "0.1.0"
+description = "Script for moving data from Phoenix to the MIG Data Exchange"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.uv]
+managed = true
+dev-dependencies = [
+    "google-auth==2.29.0",
+    "google-cloud-bigquery==3.25.0",
+    "mig-dx-api==0.1.9",
+    "pytest>=8.3.3",
+    "pytest-mock>=3.14.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["run.py"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
