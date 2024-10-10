@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import re
 import google.auth
 from mig_dx_api import (
     DX,
@@ -102,11 +103,21 @@ def write_data_to_file(source_data: list, destination_dataset: DatasetOperations
     # Log results
     print(f'upload response: {response}')
 
+def format_private_key(unformatted_key: str) -> str:
+    """
+    Portal removes all linebreaks from secrets, so add line breaks after header and before footer of private key
+    """
+    pattern = '^(-----BEGIN PRIVATE KEY-----)(.*)(-----END PRIVATE KEY-----)$'
+    key_parts = re.match(pattern, unformatted_key)
+    print(f"match: {key_parts}")
+    print(f"key: {unformatted_key}")
+    return f'{key_parts[1]}\n{key_parts[2]}\n{key_parts[3]}'
+
 def main(dataset_id: str, table_name: str, target_installation_id: str):
     print(f"Source dataset: {dataset_id}.{table_name}")
 
     # Initialize the mig client
-    private_key = f"-----BEGIN PRIVATE KEY-----\n{os.environ.get("PRIVATE_KEY")}\n-----END PRIVATE KEY-----"
+    private_key = format_private_key(os.environ.get("PRIVATE_KEY"))
     dx = DX(app_id=os.environ.get("APP_ID"), private_key=private_key)
     dx.base_url = os.environ.get("BASE_URL")
     user_info = dx.whoami()
