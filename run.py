@@ -109,8 +109,9 @@ def format_private_key(unformatted_key: str) -> str:
     """
     pattern = '^(-----BEGIN PRIVATE KEY-----)(.*)(-----END PRIVATE KEY-----)$'
     key_parts = re.match(pattern, unformatted_key)
-    print(f"match: {key_parts}")
-    print(f"key: {unformatted_key}")
+    
+    if key_parts is None:
+        raise Exception("Private key is malformed")
     return f'{key_parts[1]}\n{key_parts[2]}\n{key_parts[3]}'
 
 def main(dataset_id: str, table_name: str, target_installation_id: str):
