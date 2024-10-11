@@ -120,7 +120,8 @@ def main(dataset_id: str, table_name: str, target_installation_id: str):
     # Initialize the mig client
     private_key = format_private_key(os.environ.get("PRIVATE_KEY"))
     dx = DX(app_id=os.environ.get("APP_ID"), private_key=private_key)
-    dx.base_url = os.environ.get("BASE_URL")
+    if os.environ.get("BASE_URL"):
+        dx.base_url = os.environ.get("BASE_URL")
     user_info = dx.whoami()
     print(f"user info: {user_info}\n")
 
