@@ -129,4 +129,3 @@ def test_get_source_data(mock_bigquery):
     data = get_source_data(mock_bigquery, "dataset", "test_table")
     assert len(data) == 6
     assert data[0]['van_id'] == 241
-
