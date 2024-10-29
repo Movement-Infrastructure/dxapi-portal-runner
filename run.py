@@ -124,7 +124,6 @@ def main(dataset_id: str, table_name: str):
     client = bigquery.Client(credentials=credentials, project=project)
 
     # Initialize the mig client
-    # TODO: retrieve private key and workspace id from secret manager
     client = secretmanager.SecretManagerServiceClient()
     private_key = get_secret(client, project, PRIVATE_KEY_SECRET_NAME)
     app_id = get_secret(client, project, APP_ID_SECRET_NAME)
