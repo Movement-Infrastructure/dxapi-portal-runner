@@ -65,7 +65,7 @@ def test_get_target_installation_no_installations():
     with pytest.raises(Exception) as exception_info:
         installations = []
         get_target_installation(installations)
-        assert str(exception_info.value) == "No valid installations found"
+    assert str(exception_info.value) == "No valid installations found"
 
 def test_get_target_installation_with_installation_id_not_found():
     with pytest.raises(Exception) as exception_info:
@@ -81,14 +81,14 @@ def test_get_target_installation_with_installation_id_not_found():
             Installation(
                 movement_app_id = str(uuid4()),
                 installation_id = 31,
-                workspace_id = 100,
+                workspace_id = 101,
                 created_by = TEST_CREATOR,
                 date_created = datetime.datetime.now(),
                 name = 'Test Installation 2'
             )
         ]
         get_target_installation(installations, '21')
-        assert str(exception_info.value) == "Installation 21 not found"
+    assert str(exception_info.value) == "Installation for workspace 21 not found"
 
 @patch('google.cloud.bigquery.Client', autospec=True)
 def test_get_schema(mock_bigquery):

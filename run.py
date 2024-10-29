@@ -23,12 +23,13 @@ def get_target_installation(installations: list[Installation], workspace_id: str
         if workspace_id is None:
             raise Exception('No target workspace id specified')
         target_workspace_id = int(workspace_id)
+        target_install = None
         for install in installations:
             if install.workspace_id == target_workspace_id:
                 target_install = install
                 break
         if target_install is None:
-            raise Exception('Installation for workspace {workspace_id} not found')
+            raise Exception(f'Installation for workspace {workspace_id} not found')
         return target_install
 
 def get_schema(client: bigquery.Client, table_name: str, dataset_id: str, project: str) -> DatasetSchema:
