@@ -12,25 +12,19 @@ from mig_dx_api import (
 from mig_dx_api._dataset import DatasetOperations
 from google.cloud import bigquery
 
-def get_target_installation(installations: list[Installation], target_installation_id: str = None) -> Installation:
+def get_target_installation(installations: list[Installation], workspace_id: str = None) -> Installation:
     if len(installations) == 0:
         raise Exception("No valid installations found")
-    elif len(installations) == 1:
-        target_install = installations[0]
-        # error if the target installation id doesn't match the only existing installation
-        if target_installation_id and target_install.installation_id != int(target_installation_id):
-            raise Exception(f"Installation {target_installation_id} not found")
-        return target_install
     else:
-        if target_installation_id is None:
-            raise Exception("More than one installation available and no target installation id specified")
-        target_install_id = int(target_installation_id)
+        if workspace_id is None:
+            raise Exception("No target workspace id specified")
+        target_workspace_id = int(workspace_id)
         for install in installations:
-            if install.installation_id == target_install_id:
+            if install.workspace_id == target_workspace_id:
                 target_install = install
                 break
         if target_install is None:
-            raise Exception("Installation {target_installation_id} not found")
+            raise Exception("Installation for workspace {workspace_id} not found")
         return target_install
 
 def get_schema(client: bigquery.Client, table_name: str, dataset_id: str, project: str) -> DatasetSchema:
@@ -114,16 +108,23 @@ def format_private_key(unformatted_key: str) -> str:
         raise Exception("Private key is malformed")
     return f'{key_parts[1]}\n{key_parts[2]}\n{key_parts[3]}'
 
-def main(dataset_id: str, table_name: str, target_installation_id: str):
+def main(dataset_id: str, table_name: str):
     print(f"Source dataset: {dataset_id}.{table_name}")
 
+    target_workspace_id = os.environ.get("WORKSPACE_ID")
+    if not target_workspace_id:
+        raise Exception("Required environment variable WORKSPACE_ID not found")
+
     # Initialize the mig client
+    # TODO: retrieve private key and workspace id from secret manager
     private_key = format_private_key(os.environ.get("PRIVATE_KEY"))
     dx = DX(app_id=os.environ.get("APP_ID"), private_key=private_key)
     if os.environ.get("BASE_URL"):
         dx.base_url = os.environ.get("BASE_URL")
+
     user_info = dx.whoami()
-    print(f"user info: {user_info}\n")
+    if user_info:
+        print("Authenticated to DX API")
 
     # Initialize the google bigquery client
     credentials, project = google.auth.default(
@@ -137,7 +138,7 @@ def main(dataset_id: str, table_name: str, target_installation_id: str):
     # Check if dataset of specified name already exists
     installations = dx.get_installations()
 
-    installation = get_target_installation(installations, target_installation_id)
+    installation = get_target_installation(installations, target_workspace_id)
 
     print(f'target installation found: {installation}')
 
@@ -166,8 +167,6 @@ if __name__ == '__main__':
     parser.add_argument('--dataset_id', dest='dataset_id', type=str, help='Source dataset id', required=True)
     parser.add_argument('--table_name', dest='table_name', type=str,
         help='Source table name, also used to name destination dataset', required=True)
-    parser.add_argument('--installation_id', dest='target_installation_id', type=str,
-        help='Target installation id (optional when there is only one installation)', required=False)
     args = parser.parse_args()
     # Pass in name of BigQuery dataset from ScriptRunner
-    main(args.dataset_id, args.table_name, args.target_installation_id)
+    main(args.dataset_id, args.table_name)
