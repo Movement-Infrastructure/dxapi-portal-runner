@@ -1,8 +1,9 @@
 import argparse
 import json
 import os
-import re
 import google.auth
+from google.cloud import (bigquery, secretmanager)
+from google.cloud.secretmanager import SecretManagerServiceClient
 from mig_dx_api import (
     DX,
     DatasetSchema,
@@ -10,21 +11,24 @@ from mig_dx_api import (
     SchemaProperty
 )
 from mig_dx_api._dataset import DatasetOperations
-from google.cloud import bigquery
+
+# TODO: name these according to how they have actually been named by DNC
+PRIVATE_KEY_SECRET_NAME='mig-portal-private-key'
+APP_ID_SECRET_NAME = 'mig-portal-application-id'
 
 def get_target_installation(installations: list[Installation], workspace_id: str = None) -> Installation:
     if len(installations) == 0:
-        raise Exception("No valid installations found")
+        raise Exception('No valid installations found')
     else:
         if workspace_id is None:
-            raise Exception("No target workspace id specified")
+            raise Exception('No target workspace id specified')
         target_workspace_id = int(workspace_id)
         for install in installations:
             if install.workspace_id == target_workspace_id:
                 target_install = install
                 break
         if target_install is None:
-            raise Exception("Installation for workspace {workspace_id} not found")
+            raise Exception('Installation for workspace {workspace_id} not found')
         return target_install
 
 def get_schema(client: bigquery.Client, table_name: str, dataset_id: str, project: str) -> DatasetSchema:
@@ -47,7 +51,7 @@ def get_schema(client: bigquery.Client, table_name: str, dataset_id: str, projec
     properties = []
     for field in schema:
         # We don't care about the actual type of the field, the type is always "string"
-        property = SchemaProperty(name=field.name, type="string", required=not field.is_nullable)
+        property = SchemaProperty(name=field.name, type='string', required=not field.is_nullable)
         properties.append(property)
 
     return DatasetSchema(
@@ -97,43 +101,41 @@ def write_data_to_file(source_data: list, destination_dataset: DatasetOperations
     # Log results
     print(f'upload response: {response}')
 
-def format_private_key(unformatted_key: str) -> str:
-    """
-    Portal removes all linebreaks from secrets, so add line breaks after header and before footer of private key
-    """
-    pattern = '^(-----BEGIN PRIVATE KEY-----)(.*)(-----END PRIVATE KEY-----)$'
-    key_parts = re.match(pattern, unformatted_key)
-    
-    if key_parts is None:
-        raise Exception("Private key is malformed")
-    return f'{key_parts[1]}\n{key_parts[2]}\n{key_parts[3]}'
+def get_secret(client: SecretManagerServiceClient, project: str, secret_name: str):
+    name = client.secret_version_path(project, secret_name, 'latest')
+    response = client.access_secret_version(request={'name': name})
+    return response.payload.data.decode('UTF-8')
 
 def main(dataset_id: str, table_name: str):
-    print(f"Source dataset: {dataset_id}.{table_name}")
+    print(f'Source dataset: {dataset_id}.{table_name}')
 
-    target_workspace_id = os.environ.get("WORKSPACE_ID")
+    target_workspace_id = os.environ.get('WORKSPACE_ID')
     if not target_workspace_id:
-        raise Exception("Required environment variable WORKSPACE_ID not found")
-
-    # Initialize the mig client
-    # TODO: retrieve private key and workspace id from secret manager
-    private_key = format_private_key(os.environ.get("PRIVATE_KEY"))
-    dx = DX(app_id=os.environ.get("APP_ID"), private_key=private_key)
-    if os.environ.get("BASE_URL"):
-        dx.base_url = os.environ.get("BASE_URL")
-
-    user_info = dx.whoami()
-    if user_info:
-        print("Authenticated to DX API")
+        raise Exception('Required environment variable WORKSPACE_ID not found')
 
     # Initialize the google bigquery client
     credentials, project = google.auth.default(
         scopes=[
-            "https://www.googleapis.com/auth/bigquery",
+            'https://www.googleapis.com/auth/bigquery',
         ]
     )
-    print(f"bigquery project: {project}")
+    print(f'bigquery project: {project}')
     client = bigquery.Client(credentials=credentials, project=project)
+
+    # Initialize the mig client
+    # TODO: retrieve private key and workspace id from secret manager
+    client = secretmanager.SecretManagerServiceClient()
+    private_key = get_secret(client, project, PRIVATE_KEY_SECRET_NAME)
+    app_id = get_secret(client, project, APP_ID_SECRET_NAME)
+
+    dx = DX(app_id=app_id, private_key=private_key)
+
+    if os.environ.get('BASE_URL'):
+        dx.base_url = os.environ.get('BASE_URL')
+
+    user_info = dx.whoami()
+    if user_info:
+        print('Authenticated to DX API')
 
     # Check if dataset of specified name already exists
     installations = dx.get_installations()
