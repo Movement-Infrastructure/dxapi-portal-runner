@@ -9,8 +9,7 @@ from unittest.mock import patch
 from run import (
     get_target_installation,
     get_schema,
-    get_source_data,
-    format_private_key
+    get_source_data
 )
 
 TEST_APP_ID = str(uuid4())
@@ -21,22 +20,25 @@ TEST_CREATOR = CreatedBy(
     email = 'test@example.com')
 
 def test_get_target_installation_default():
+    workspace_id = '100'
     installations = [
         Installation(
             movement_app_id = str(uuid4()),
             installation_id = 1,
-            workspace_id = 100,
+            workspace_id = int(workspace_id),
             created_by = TEST_CREATOR,
             date_created = datetime.datetime.now(),
             name = 'Test Installation'
         )
     ]
 
-    target_installation = get_target_installation(installations)
+    target_installation = get_target_installation(installations, workspace_id)
     
     assert target_installation == installations[0]
 
 def test_get_target_installation_with_install_id_argument():
+    workspace_id = '31'
+
     installations = [
         Installation(
             movement_app_id = str(uuid4()),
@@ -48,8 +50,8 @@ def test_get_target_installation_with_install_id_argument():
         ),
         Installation(
             movement_app_id = str(uuid4()),
-            installation_id = 31,
-            workspace_id = 100,
+            installation_id = 35,
+            workspace_id = int(workspace_id),
             created_by = TEST_CREATOR,
             date_created = datetime.datetime.now(),
             name = 'Test Installation 2'
