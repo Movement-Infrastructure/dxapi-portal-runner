@@ -12,10 +12,6 @@ from mig_dx_api import (
 )
 from mig_dx_api._dataset import DatasetOperations
 
-# TODO: name these according to how they have actually been named by DNC
-PRIVATE_KEY_SECRET_NAME='mig-portal-private-key'
-APP_ID_SECRET_NAME = 'mig-portal-application-id'
-
 def get_target_installation(installations: list[Installation], workspace_id: str = None) -> Installation:
     if len(installations) == 0:
         raise Exception('No valid installations found')
@@ -125,8 +121,14 @@ def main(dataset_id: str, table_name: str):
 
     # Initialize the mig client
     client = secretmanager.SecretManagerServiceClient()
-    private_key = get_secret(client, project, PRIVATE_KEY_SECRET_NAME)
-    app_id = get_secret(client, project, APP_ID_SECRET_NAME)
+
+    private_key_secret_name=os.environ.get('PRIVATE_KEY_SECRET_NAME')
+    app_id_secret_name = os.environ.get('APP_ID_SECRET_NAME')
+    if not private_key_secret_name or not app_id_secret_name:
+        raise Exception('Required secret name environment variables not found')
+
+    private_key = get_secret(client, project, private_key_secret_name)
+    app_id = get_secret(client, project, app_id_secret_name)
 
     dx = DX(app_id=app_id, private_key=private_key)
 
