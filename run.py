@@ -26,7 +26,7 @@ def get_target_installation(installations: list[Installation], target_installati
     elif len(installations) == 1:
         target_install = installations[0]
         # error if the target installation id doesn't match the only existing installation
-        if target_installation_id and target_install.instalaltion_id != int(target_installation_id):
+        if target_installation_id and target_install.installation_id != int(target_installation_id):
             raise Exception(f"Installation {target_installation_id} not found")
         return target_install
     else:
