@@ -101,15 +101,16 @@ def get_source_data(client: bigquery.Client, dataset_id: str, table_name: str) -
     for row in rows:
         row_data_string = row.values()[0]
         data.append(json.loads(row_data_string))
-    print(f'{get_formatted_date} | finished collecting data')
+    print(f'{get_formatted_date()} | finished collecting data')
     return data
 
 def create_data_buffer(source_data: list) -> io.StringIO:
     fieldnames = source_data[0].keys()
-    _buffer = io.StringIO()
-    writer = csv.DictWriter(_buffer, fieldnames=fieldnames)
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=fieldnames)
     writer.writeheader()
     writer.writerows(source_data)
+    return buffer
 
 def get_upload_url(dataset: DatasetOperations, is_resumable: bool = False):
     if is_resumable:
@@ -124,13 +125,14 @@ def write_data_to_signed_url(source_data: list, destination_dataset: DatasetOper
     # Log results
     print(f'upload response: {response}')
 
-def write_chunked_data(data_buffer: io.StringIO, approx_data_size: int, destination_dataset: DatasetOperations):
+def write_chunked_data(
+    data_buffer: io.StringIO,
+    approx_data_size: int,
+    upload_url: str):
     """
     Write data from Portal source dataset to file in MiG landing bucket
     """
     data_buffer.seek(0)
-
-    upload_url = get_upload_url(destination_dataset, True)
 
     # Track the start byte for each chunk
     start_byte = 0
@@ -147,7 +149,7 @@ def write_chunked_data(data_buffer: io.StringIO, approx_data_size: int, destinat
             "Content-Range": f"bytes {start_byte}-{end_byte}/{approx_data_size}",
             "Content-Type": "text/csv",
         }
-        print(f'{get_formatted_date} | attempting to send {start_byte} to {end_byte} bytes')
+        print(f'{get_formatted_date()} | attempting to send {start_byte} to {end_byte} bytes')
 
         # Upload the chunk
         response = requests.put(upload_url['url'], headers=headers, data=chunk)
@@ -221,13 +223,13 @@ def main(dataset_id: str, table_name: str, target_installation_id: str):
 
         # estimate size of file based on number of characters
         approx_data_size = data_buffer.tell()
-        print(f'{get_formatted_date}| data size: {approx_data_size} bytes')
+        print(f'{get_formatted_date()}| data size: {approx_data_size} bytes')
 
         # get upload url and write data to MIG bucket
         if approx_data_size > CHUNK_SIZE:
             print(f'data size is larger than {CHUNK_SIZE} bytes so sending in chunks')
             resumable_url = get_upload_url(destination_dataset, True)
-            write_chunked_data(data_buffer, destination_dataset, resumable_url)
+            write_chunked_data(data_buffer, approx_data_size, resumable_url)
         else:
             print(f'data size is smaller than {CHUNK_SIZE} bytes so sending all at once')
             upload_url = get_upload_url(destination_dataset)

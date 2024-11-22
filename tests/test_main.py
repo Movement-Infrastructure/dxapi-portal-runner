@@ -10,6 +10,7 @@ from run import (
     get_target_installation,
     get_schema,
     get_source_data,
+    create_data_buffer,
     format_private_key
 )
 
@@ -129,6 +130,31 @@ def test_get_source_data(mock_bigquery):
     data = get_source_data(mock_bigquery, "dataset", "test_table")
     assert len(data) == 6
     assert data[0]['van_id'] == 241
+
+def test_create_data_buffer():
+    source_data = [
+        {'van_id': 241, 'first_name': 'Erika', 'last_name': 'Testuser', 'city': 'Decatur', 'state': 'AL'},
+        {'van_id': 110, 'first_name': 'Ulysses', 'last_name': 'Testuser', 'city': 'Hoover', 'state': 'AL'},
+        {'van_id': 242, 'first_name': 'Earl', 'last_name': 'Testuser', 'city': 'Santa Clara', 'state': 'CA'},
+        {'van_id': 111, 'first_name': 'Quinn', 'last_name': 'Testuser', 'city': 'Clovis', 'state': 'CA'},
+        {'van_id': 103, 'first_name': 'Jane', 'last_name': 'Testuser', 'city': 'San Bernardino', 'state': 'CA'},
+        {'van_id': 117, 'first_name': 'Sylvia', 'last_name': 'Testuser', 'city': 'Elk Grove', 'state': 'CA'}
+    ]
+    data_buffer = create_data_buffer(source_data)
+
+    approx_data_size_with_tell = data_buffer.tell()
+    approx_data_size_with_len = len(data_buffer.getvalue())
+    assert approx_data_size_with_tell == 238
+    assert approx_data_size_with_len == 238
+
+def test_get_upload_url_resumable():
+    assert True
+
+def test_get_upload_url_signed():
+    assert True
+
+def test_write_chunked_data():
+    assert True
 
 def test_format_private_key():
     unformatted_key = '-----BEGIN PRIVATE KEY-----MIICUTCCAfugAwIBAgIBADANBgkqhkiG9w0BAQQFADBXMQswCQYDVQQGEwJDTjELMAkGA1UECBMCUE4xCzAJBgNVBAcTAkNOMQswCQYDVQQKEwJPTjELMAkGA1UECxMCVU4xFDASBgNVBAMTC0hlcm9uZyBZYW5nMB4XDTA1MDcxNTIxMTk0N1oXDTA1MDgxNDIxMTk0N1owVzELMAkGA1UEBhMCQ04xCzAJBgNVBAgTAlBOMQswCQYDVQQHEwJDTjELMAkGA1UEChMCT04xCzAJBgNVBAsTAlVOMRQwEgYDVQQDEwtIZXJvbmcgWWFuZzBcMA0GCSqGSIb3DQEBAQUAA0sAMEgCQQCp5hnG7ogBhtlynpOS21cBewKE/B7jV14qeyslnr26xZUsSVko36ZnhiaO/zbMOoRcKK9vEcgMtcLFuQTWDl3RAgMBAAGjgbEwga4wHQYDVR0OBBYEFFXI70krXeQDxZgbaCQoR4jUDncEMH8GA1UdIwR4MHaAFFXI70krXeQDxZgbaCQoR4jUDncEoVukWTBXMQswCQYDVQQGEwJDTjELMAkGA1UEBQADQQA/ugzBrjjK9jcWnDVfGHlk3icNRq0oV7Ri32z/+HQX67aRfgZu7KWdI+JuWm7DCfrPNGVwFWUQOmsPue9rZBgO-----END PRIVATE KEY-----'
