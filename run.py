@@ -104,71 +104,65 @@ def get_source_data(client: bigquery.Client, dataset_id: str, table_name: str) -
     print(f'{get_formatted_date} | finished collecting data')
     return data
 
-def get_upload_url(dataset: DatasetOperations, is_resumable: bool = False):
-    if is_resumable:
-        return dataset.get_upload_url(mode='replace', upload_type='resumable')
-
-    return dataset.get_upload_url(mode='replace')
-
-def write_data_to_file(source_data: list, destination_dataset: DatasetOperations):
-    """
-    Write data from Portal source dataset to file in MiG landing bucket
-    """
+def create_data_buffer(source_data: list) -> io.StringIO:
     fieldnames = source_data[0].keys()
     _buffer = io.StringIO()
     writer = csv.DictWriter(_buffer, fieldnames=fieldnames)
     writer.writeheader()
     writer.writerows(source_data)
 
-    # estimate size of file based on number of characters
-    approx_data_size = _buffer.tell()
-    _buffer.seek(0)
+def get_upload_url(dataset: DatasetOperations, is_resumable: bool = False):
+    if is_resumable:
+        return dataset.get_upload_url(mode='replace', upload_type='resumable')
 
-    print(f'{get_formatted_date}| data size: {approx_data_size} bytes')
+    return dataset.get_upload_url(mode='replace')
 
-    if (approx_data_size > CHUNK_SIZE):
-        print(f'data size is larger than {CHUNK_SIZE} bytes so sending in chunks')
-        upload_url = get_upload_url(destination_dataset, True)
+def write_data_to_signed_url(source_data: list, destination_dataset: DatasetOperations):
+    upload_url = get_upload_url(destination_dataset)
+    # Upload the data for the dataset in MIG to presigned url
+    response = destination_dataset.upload_data_to_url(upload_url['url'], source_data)
+    # Log results
+    print(f'upload response: {response}')
 
-        # Track the start byte for each chunk
-        start_byte = 0
+def write_chunked_data(data_buffer: io.StringIO, approx_data_size: int, destination_dataset: DatasetOperations):
+    """
+    Write data from Portal source dataset to file in MiG landing bucket
+    """
+    data_buffer.seek(0)
 
-        # Iterate over the buffered data by chunk
-        while True:
-            chunk = _buffer.read(CHUNK_SIZE)
-            if not chunk:
-                print('end of file, break')
-                break  # Break if the end of file is reached
+    upload_url = get_upload_url(destination_dataset, True)
 
-            end_byte = start_byte + len(chunk) - 1
-            headers = {
-                "Content-Range": f"bytes {start_byte}-{end_byte}/{approx_data_size}",
-                "Content-Type": "text/csv",
-            }
-            print(f'{get_formatted_date} | attempting to send {start_byte} to {end_byte} bytes')
+    # Track the start byte for each chunk
+    start_byte = 0
 
-            # Upload the chunk
-            response = requests.put(upload_url['url'], headers=headers, data=chunk)
-            # response = requests.put(upload_url, headers=headers, data=chunk)
-            print(f'response: {response}')
+    # Iterate over the buffered data by chunk
+    while True:
+        chunk = data_buffer.read(CHUNK_SIZE)
+        if not chunk:
+            print('end of file, break')
+            break  # Break if the end of file is reached
 
-            if response.status_code in [200, 201]:
-                print("Upload complete.")
-                break  # Successfully uploaded the whole file
-            elif response.status_code == 308:
-                # 308 indicates that the upload is incomplete and we can continue
-                print(f"Uploaded bytes {start_byte} to {end_byte}")
-                start_byte = end_byte + 1
-            else:
-                # Handle upload failure
-                raise Exception(f"Upload failed: {response.text}")
-    else:
-        print(f'data size is smaller than {CHUNK_SIZE} bytes so sending all at once')
-        upload_url = get_upload_url(destination_dataset)
-        # Upload the data for the dataset in MIG to presigned url
-        response = destination_dataset.upload_data_to_url(upload_url['url'], source_data)
-        # Log results
-        print(f'upload response: {response}')
+        end_byte = start_byte + len(chunk) - 1
+        headers = {
+            "Content-Range": f"bytes {start_byte}-{end_byte}/{approx_data_size}",
+            "Content-Type": "text/csv",
+        }
+        print(f'{get_formatted_date} | attempting to send {start_byte} to {end_byte} bytes')
+
+        # Upload the chunk
+        response = requests.put(upload_url['url'], headers=headers, data=chunk)
+        print(f'response: {response}')
+
+        if response.status_code in [200, 201]:
+            print("Upload complete.")
+            break  # Successfully uploaded the whole file
+        elif response.status_code == 308:
+            # 308 indicates that the upload is incomplete and we can continue
+            print(f"Uploaded bytes {start_byte} to {end_byte}")
+            start_byte = end_byte + 1
+        else:
+            # Handle upload failure
+            raise Exception(f"Upload failed: {response.text}")
 
 def format_private_key(unformatted_key: str) -> str:
     """
@@ -222,8 +216,22 @@ def main(dataset_id: str, table_name: str, target_installation_id: str):
         # Get data from source dataset
         source_data = get_source_data(client, dataset_id, table_name)
 
-        # Write data to mig bucket for processing
-        write_data_to_file(source_data, destination_dataset)
+        # Create buffer of data for writing to mig bucket (so size can be checked)
+        data_buffer = create_data_buffer(source_data)
+
+        # estimate size of file based on number of characters
+        approx_data_size = data_buffer.tell()
+        print(f'{get_formatted_date}| data size: {approx_data_size} bytes')
+
+        # get upload url and write data to MIG bucket
+        if approx_data_size > CHUNK_SIZE:
+            print(f'data size is larger than {CHUNK_SIZE} bytes so sending in chunks')
+            resumable_url = get_upload_url(destination_dataset, True)
+            write_chunked_data(data_buffer, destination_dataset, resumable_url)
+        else:
+            print(f'data size is smaller than {CHUNK_SIZE} bytes so sending all at once')
+            upload_url = get_upload_url(destination_dataset)
+            write_data_to_signed_url(data_buffer, destination_dataset, upload_url)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
