@@ -114,6 +114,8 @@ def test_get_source_data(mock_bigquery):
     mock_query_job = mock.create_autospec(bigquery.QueryJob)
     # row data coming back from bigquery is a string, not json
     mock_rows = mock.create_autospec(bigquery.table.RowIterator)
+    mock_rows.total_rows = 6
+
     mock_rows.__iter__.return_value = [
         bigquery.Row(('{"van_id": 241, "first_name": "Erika", "last_name": "Testuser", "city": "Decatur", "state": "AL"}',), {'json':0}),
         bigquery.Row(('{"van_id": 110, "first_name": "Ulysses", "last_name": "Testuser", "city": "Hoover", "state": "AL"}',), {'json':0}),
