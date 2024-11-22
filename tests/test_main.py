@@ -2,15 +2,17 @@ import pytest
 import datetime
 from google.cloud import bigquery
 from mig_dx_api import CreatedBy, Installation
+from mig_dx_api._dataset import DatasetOperations
 from uuid import uuid4
 from unittest import mock
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from run import (
     get_target_installation,
     get_schema,
     get_source_data,
     create_data_buffer,
+    get_upload_url,
     format_private_key
 )
 
@@ -147,11 +149,23 @@ def test_create_data_buffer():
     assert approx_data_size_with_tell == 238
     assert approx_data_size_with_len == 238
 
-def test_get_upload_url_resumable():
-    assert True
+def test_get_resumable_upload_url():
+    datasetOps = DatasetOperations(MagicMock(), MagicMock())
+    datasetOps.get_upload_url = MagicMock()
 
-def test_get_upload_url_signed():
-    assert True
+    get_upload_url(datasetOps, True)
+
+    # Check if the method was called with the correct arguments
+    datasetOps.get_upload_url.assert_called_with(mode='replace', upload_type='resumable')
+
+def test_get_signed_upload_url():
+    datasetOps = DatasetOperations(MagicMock(), MagicMock())
+    datasetOps.get_upload_url = MagicMock()
+
+    get_upload_url(datasetOps)
+
+    # Check if the method was called with the correct arguments
+    datasetOps.get_upload_url.assert_called_with(mode='replace')
 
 def test_write_chunked_data():
     assert True
