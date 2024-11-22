@@ -32,9 +32,9 @@ def get_target_installation(installations: list[Installation], target_installati
     else:
         if target_installation_id is None:
             raise Exception("More than one installation available and no target installation id specified")
-        target_installation_id = int(target_installation_id)
+        target_install_id = int(target_installation_id)
         for install in installations:
-            if install.installation_id == target_installation_id:
+            if install.installation_id == target_install_id:
                 target_install = install
                 break
         if target_install is None:
