@@ -119,8 +119,7 @@ def get_upload_url(dataset: DatasetOperations, is_resumable: bool = False):
 
     return dataset.get_upload_url(mode='replace')
 
-def write_data_to_signed_url(source_data: list, destination_dataset: DatasetOperations):
-    upload_url = get_upload_url(destination_dataset)
+def write_data_to_signed_url(source_data: list, destination_dataset: DatasetOperations, upload_url: str):
     # Upload the data for the dataset in MIG to presigned url
     response = destination_dataset.upload_data_to_url(upload_url['url'], source_data)
     # Log results
