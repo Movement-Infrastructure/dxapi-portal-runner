@@ -173,6 +173,7 @@ def format_private_key(unformatted_key: str) -> str:
     if key_parts is None:
         raise Exception('Private key is malformed')
     return f'{key_parts[1]}\n{key_parts[2]}\n{key_parts[3]}'
+
 def get_secret(client: SecretManagerServiceClient, project: str, secret_name: str):
     name = client.secret_version_path(project, secret_name, 'latest')
     response = client.access_secret_version(request={'name': name})

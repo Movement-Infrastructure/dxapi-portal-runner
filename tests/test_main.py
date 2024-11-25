@@ -102,7 +102,7 @@ def test_get_target_installation_with_installation_id_not_found():
             )
         ]
         get_target_installation(installations, '21')
-    assert str(exception_info.value) == "Installation for workspace 21 not found"
+    assert str(exception_info.value) == 'Installation for workspace 21 not found'
 
 @patch('google.cloud.bigquery.Client', autospec=True)
 def test_get_schema(mock_bigquery):
