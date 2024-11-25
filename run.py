@@ -234,7 +234,7 @@ def main(dataset_id: str, table_name: str, target_installation_id: str):
         else:
             print(f'data size is smaller than {CHUNK_SIZE} bytes so sending all at once')
             upload_url = get_upload_url(destination_dataset)
-            write_data_to_signed_url(data_buffer, destination_dataset, upload_url)
+            write_data_to_signed_url(source_data, destination_dataset, upload_url)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
