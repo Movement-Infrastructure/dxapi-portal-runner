@@ -72,9 +72,9 @@ def get_schema(client: bigquery.Client, table_name: str, dataset_id: str, projec
 
 def create_dataset(dx: DX, installation: Installation, dataset_name: str, dataset_schema: DatasetSchema) -> DatasetOperations:
     """
-    Create MiG dataset using mig-dx-api client
+    Create MIG dataset using mig-dx-api client
     """
-    # create MiG dataset with source schema
+    # create MIG dataset with source schema
     with dx.installation(installation) as ctx:
         new_dataset = ctx.datasets.create(
             name=dataset_name,
@@ -131,7 +131,7 @@ def write_chunked_data(
     upload_url: str,
     chunk_size: int):
     """
-    Write data from Portal source dataset to file in MiG landing bucket
+    Write data from Portal source dataset to file in MIG landing bucket
     """
     data_buffer.seek(0)
 
