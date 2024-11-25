@@ -1,7 +1,11 @@
 import argparse
+import csv
+import datetime
+import io
 import json
 import os
 import re
+import requests
 import google.auth
 from mig_dx_api import (
     DX,
@@ -11,26 +15,31 @@ from mig_dx_api import (
 )
 from mig_dx_api._dataset import DatasetOperations
 from google.cloud import bigquery
+CHUNK_SIZE = 1024 * 1024 * 16 # 16 MiB
+
+def get_formatted_date() -> str:
+    return datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S.%f')
 
 def get_target_installation(installations: list[Installation], target_installation_id: str = None) -> Installation:
     if len(installations) == 0:
-        raise Exception("No valid installations found")
+        raise Exception('No valid installations found')
     elif len(installations) == 1:
         target_install = installations[0]
         # error if the target installation id doesn't match the only existing installation
         if target_installation_id and target_install.installation_id != int(target_installation_id):
-            raise Exception(f"Installation {target_installation_id} not found")
+            raise Exception(f'Installation {target_installation_id} not found')
         return target_install
     else:
+        target_install = None
         if target_installation_id is None:
-            raise Exception("More than one installation available and no target installation id specified")
+            raise Exception('More than one installation available and no target installation id specified')
         target_install_id = int(target_installation_id)
         for install in installations:
             if install.installation_id == target_install_id:
                 target_install = install
                 break
         if target_install is None:
-            raise Exception("Installation {target_installation_id} not found")
+            raise Exception(f'Installation {target_installation_id} not found')
         return target_install
 
 def get_schema(client: bigquery.Client, table_name: str, dataset_id: str, project: str) -> DatasetSchema:
@@ -47,13 +56,13 @@ def get_schema(client: bigquery.Client, table_name: str, dataset_id: str, projec
     table_constraints = table.table_constraints # might not exist
     primary_key = table_constraints.primary_key.columns if table_constraints else []
 
-    print(f'bigquery schema: {schema}')
+    print(f'{get_formatted_date()} | bigquery schema: {schema}')
     print(f'table constraints: {primary_key}')
 
     properties = []
     for field in schema:
         # We don't care about the actual type of the field, the type is always "string"
-        property = SchemaProperty(name=field.name, type="string", required=not field.is_nullable)
+        property = SchemaProperty(name=field.name, type='string', required=not field.is_nullable)
         properties.append(property)
 
     return DatasetSchema(
@@ -63,16 +72,16 @@ def get_schema(client: bigquery.Client, table_name: str, dataset_id: str, projec
 
 def create_dataset(dx: DX, installation: Installation, dataset_name: str, dataset_schema: DatasetSchema) -> DatasetOperations:
     """
-    Create MiG dataset using mig-dx-api client
+    Create MIG dataset using mig-dx-api client
     """
-    # create MiG dataset with source schema
+    # create MIG dataset with source schema
     with dx.installation(installation) as ctx:
         new_dataset = ctx.datasets.create(
             name=dataset_name,
             description='Dataset created through Portal Script Runner',
             schema=dataset_schema
         )
-        print(f'new dataset: {new_dataset}')
+        print(f'{get_formatted_date()} | new dataset: {new_dataset}')
         return new_dataset
 
 def get_source_data(client: bigquery.Client, dataset_id: str, table_name: str) -> list:
@@ -88,20 +97,75 @@ def get_source_data(client: bigquery.Client, dataset_id: str, table_name: str) -
     """
     query_job = client.query(sql)
     rows = query_job.result()
+    print(f'{get_formatted_date()} | fetched {rows.total_rows:,} rows from {dataset_id}.{table_name}')
     data = []
     for row in rows:
         row_data_string = row.values()[0]
         data.append(json.loads(row_data_string))
+    print(f'{get_formatted_date()} | finished collecting data')
     return data
 
-def write_data_to_file(source_data: list, destination_dataset: DatasetOperations, upload_url: str):
-    """
-    Write data from Portal source dataset to file in MiG landing bucket
-    """
+def create_data_buffer(source_data: list) -> io.StringIO:
+    fieldnames = source_data[0].keys()
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=fieldnames)
+    writer.writeheader()
+    writer.writerows(source_data)
+    return buffer
+
+def get_upload_url(dataset: DatasetOperations, is_resumable: bool = False):
+    if is_resumable:
+        return dataset.get_upload_url(mode='replace', upload_type='resumable')
+
+    return dataset.get_upload_url(mode='replace')
+
+def write_data_to_signed_url(source_data: list, destination_dataset: DatasetOperations, upload_url: str):
     # Upload the data for the dataset in MIG to presigned url
     response = destination_dataset.upload_data_to_url(upload_url['url'], source_data)
     # Log results
     print(f'upload response: {response}')
+
+def write_chunked_data(
+    data_buffer: io.StringIO,
+    approx_data_size: int,
+    upload_url: str,
+    chunk_size: int):
+    """
+    Write data from Portal source dataset to file in MIG landing bucket
+    """
+    data_buffer.seek(0)
+
+    # Track the start byte for each chunk
+    start_byte = 0
+
+    # Iterate over the buffered data by chunk
+    while True:
+        chunk = data_buffer.read(chunk_size)
+        if not chunk:
+            print('end of file, break')
+            break  # Break if the end of file is reached
+
+        end_byte = start_byte + len(chunk) - 1
+        headers = {
+            'Content-Range': f'bytes {start_byte}-{end_byte}/{approx_data_size}',
+            'Content-Type': 'text/csv',
+        }
+        print(f'{get_formatted_date()} | attempting to send {start_byte} to {end_byte} bytes')
+
+        # Upload the chunk
+        response = requests.put(upload_url['url'], headers=headers, data=chunk)
+        print(f'response: {response}')
+
+        if response.status_code in [200, 201]:
+            print('Upload complete.')
+            break  # Successfully uploaded the whole file
+        elif response.status_code == 308:
+            # 308 indicates that the upload is incomplete and we can continue
+            print(f'Uploaded bytes {start_byte} to {end_byte}')
+            start_byte = end_byte + 1
+        else:
+            # Handle upload failure
+            raise Exception(f'Upload failed: {response.text}')
 
 def format_private_key(unformatted_key: str) -> str:
     """
@@ -111,27 +175,27 @@ def format_private_key(unformatted_key: str) -> str:
     key_parts = re.match(pattern, unformatted_key)
     
     if key_parts is None:
-        raise Exception("Private key is malformed")
+        raise Exception('Private key is malformed')
     return f'{key_parts[1]}\n{key_parts[2]}\n{key_parts[3]}'
 
 def main(dataset_id: str, table_name: str, target_installation_id: str):
-    print(f"Source dataset: {dataset_id}.{table_name}")
+    print(f'Source dataset: {dataset_id}.{table_name}')
 
     # Initialize the mig client
-    private_key = format_private_key(os.environ.get("PRIVATE_KEY"))
-    dx = DX(app_id=os.environ.get("APP_ID"), private_key=private_key)
-    if os.environ.get("BASE_URL"):
-        dx.base_url = os.environ.get("BASE_URL")
+    private_key = format_private_key(os.environ.get('PRIVATE_KEY'))
+    dx = DX(app_id=os.environ.get('APP_ID'), private_key=private_key)
+    if os.environ.get('BASE_URL'):
+        dx.base_url = os.environ.get('BASE_URL')
     user_info = dx.whoami()
-    print(f"user info: {user_info}\n")
+    print(f'user info: {user_info}\n')
 
     # Initialize the google bigquery client
     credentials, project = google.auth.default(
         scopes=[
-            "https://www.googleapis.com/auth/bigquery",
+            'https://www.googleapis.com/auth/bigquery',
         ]
     )
-    print(f"bigquery project: {project}")
+    print(f'bigquery project: {project}')
     client = bigquery.Client(credentials=credentials, project=project)
 
     # Check if dataset of specified name already exists
@@ -155,11 +219,22 @@ def main(dataset_id: str, table_name: str, target_installation_id: str):
         # Get data from source dataset
         source_data = get_source_data(client, dataset_id, table_name)
 
-        # Get signed uploadurl from MIG
-        upload_url = destination_dataset.get_upload_url(mode='replace')
+        # Create buffer of data for writing to mig bucket (so size can be checked)
+        data_buffer = create_data_buffer(source_data)
 
-        # Write data to mig bucket for processing
-        write_data_to_file(source_data, destination_dataset, upload_url)
+        # estimate size of file based on number of characters
+        approx_data_size = data_buffer.tell()
+        print(f'{get_formatted_date()}| data size: {approx_data_size} bytes')
+
+        # get upload url and write data to MIG bucket
+        if approx_data_size > CHUNK_SIZE:
+            print(f'data size is larger than {CHUNK_SIZE} bytes so sending in chunks')
+            resumable_url = get_upload_url(destination_dataset, True)
+            write_chunked_data(data_buffer, approx_data_size, resumable_url, CHUNK_SIZE)
+        else:
+            print(f'data size is smaller than {CHUNK_SIZE} bytes so sending all at once')
+            upload_url = get_upload_url(destination_dataset)
+            write_data_to_signed_url(data_buffer, destination_dataset, upload_url)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
